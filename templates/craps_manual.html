@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Craps Tips</title>
+</head>
+<body>
+    <h1>Craps Manual</h1>
+  
+    <object 
+        data="{{ url_for('static', filename='documents/Craps_Manual.pdf') }}" 
+        type="application/pdf" 
+        width="100%" 
+        height="800px">
+        <p>Your browser does not support viewing PDFs. 
+           <a href="{{ url_for('static', filename='documents/Craps_Manual.pdf') }}">Download the PDF</a>.
+        </p>
+    </object>
+    <p>
+        <a href="{{ url_for('static', filename='documents/Craps_Manual.pdf') }}" download>
+            Download Craps Manual (PDF)
+        </a>
+    </p>
+    <div class="text-center mt-4">
+        <a href="/" class="btn btn-secondary">Back to Main</a>
+    </div>
+</body>
+</html>

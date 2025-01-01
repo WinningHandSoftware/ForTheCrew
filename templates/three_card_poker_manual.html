@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title> Tips</title>
+</head>
+<body>
+    <h1>Manual</h1>
+  
+    <object 
+        data="{{ url_for('static', filename='documents/Three_Card_Poker.pdf') }}" 
+        type="application/pdf" 
+        width="100%" 
+        height="800px">
+        <p>Your browser does not support viewing PDFs. 
+           <a href="{{ url_for('static', filename='documents/Three_Card_Poker.pdf') }}">Download the PDF</a>.
+        </p>
+    </object>
+    <p>
+        <a href="{{ url_for('static', filename='documents/Three_Card_Poker.pdf') }}" download>
+            Download Three Card Poker Manual (PDF)
+        </a>
+    </p>
+    <div class="text-center mt-4">
+        <a href="/" class="btn btn-secondary">Back to Main</a>
+    </div>
+</body>
+</html>
