@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Updates</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+</head>
+
+<body class="container">
+    <h1 class="mt-4">Manage Casino Updates</h1>
+
+    <form method="POST" class="mb-4">
+        <div class="mb-3">
+            <label for="title" class="form-label">Update Title</label>
+            <input type="text" name="title" id="title" class="form-control" required>
+        </div>
+        <div class="mb-3">
+            <label for="content" class="form-label">Content</label>
+            <textarea name="content" id="content" class="form-control" rows="5" required></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">Post Update</button>
+    </form>
+
+    <h2>Existing Updates</h2>
+    <ul class="list-group">
+        {% for update in updates %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+            <div>
+                <h5>{{ update.title }}</h5>
+                <p>{{ update.content }}</p>
+                <small>Posted on {{ update.date_posted }}</small>
+            </div>
+            <form method="POST" action="/admin/updates/delete/{{ update.id }}">
+                <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+            </form>
+        </li>
+        {% endfor %}
+    </ul>
+    <div class="text-center mt-4">
+        <a href="/" class="btn btn-secondary">Back to Main</a>
+    </div>
+</body>
+
+</html>
