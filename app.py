@@ -51,6 +51,8 @@ def logout():
     return redirect('/login')
 
 # Toke Management Routes
+from datetime import datetime, timedelta
+
 @app.route('/toke', methods=['GET', 'POST'])
 def toke():
     user_role = session.get('user_role')
@@ -60,16 +62,29 @@ def toke():
         return redirect('/login')
     
     if request.method == 'POST' and user_role == 'admin':
+        # Get data from the form
         new_toke_count = request.form.get('toke_count')
+        adjust_date = request.form.get('adjust_date')  # "current" or "previous"
+        
+        # Calculate date based on gaming day logic
+        now = datetime.now()
+        gaming_day = now.date()
+        if adjust_date == "previous" or (now.hour < 6):
+            gaming_day -= timedelta(days=1)
+        
+        # Save to database
         try:
-            new_toke = Toke(date=date.today(), toke_count=float(new_toke_count), added_by="Admin")
+            new_toke = Toke(date=gaming_day, toke_count=float(new_toke_count), added_by="Admin")
             db.session.add(new_toke)
             db.session.commit()
         except Exception as e:
             return f"An error occurred: {e}"
     
+    # Retrieve data
     toke_data = Toke.query.order_by(Toke.date.desc()).all()
     total_toke_count = db.session.query(func.sum(Toke.toke_count)).scalar() or 0.0
+    
+    # Show current week's tip rate for dealers
     current_week_tokes = Toke.query.filter(Toke.date >= (date.today() - timedelta(days=7))).all()
     weekly_tip_rate = sum([toke.toke_count for toke in current_week_tokes])
     
@@ -80,6 +95,7 @@ def toke():
         weekly_tip_rate=weekly_tip_rate if user_role == 'dealer' else None, 
         is_admin=(user_role == 'admin')
     )
+
 
 @app.route('/toke/delete/<int:toke_id>', methods=['POST'])
 def delete_toke(toke_id):
@@ -217,4 +233,5 @@ def carnival_game(game):
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)
+
