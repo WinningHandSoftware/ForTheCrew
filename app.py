@@ -2,20 +2,24 @@ from flask import Flask, render_template, request, session, redirect, url_for, f
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, date, timedelta
 from sqlalchemy.sql import func
+from flask_migrate import Migrate
+
 
 app = Flask(__name__)
 
 # Configurations
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///toke.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.secret_key = 'replace_with_your_randomly_generated_key'
+app.secret_key = 'whyshouldidoitforfree'
 db = SQLAlchemy(app)
+migrate = Migrate(app, db)
 
 # Database Models
 class Toke(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     date = db.Column(db.Date, nullable=False)
     toke_count = db.Column(db.Float, nullable=False)
+    hours_worked = db.Column(db.Float, nullable=False, default=0)  # New Column
     added_by = db.Column(db.String(50), nullable=False)
 
 class CasinoUpdate(db.Model):
@@ -51,51 +55,153 @@ def logout():
     return redirect('/login')
 
 # Toke Management Routes
-from datetime import datetime, timedelta
-
 @app.route('/toke', methods=['GET', 'POST'])
 def toke():
     user_role = session.get('user_role')
-    
     if not user_role:
         flash('Please log in to access the Toke page.', 'danger')
         return redirect('/login')
-    
+
+    # Get the current year
+    current_year = date.today().year
+
+    # Calculate all weeks in the year
+    start_of_year = date(current_year, 1, 1)
+    start_of_week = start_of_year - timedelta(days=start_of_year.weekday())  # Start from the first Monday
+    available_weeks = []
+    for i in range(52):  # Assuming 52 weeks in a year
+        week_start = start_of_week + timedelta(weeks=i)
+        week_end = week_start + timedelta(days=6)
+        if week_start.year > current_year:
+            break  # Stop if the week goes into the next year
+        available_weeks.append({
+            "id": f"week-{i + 1}",
+            "label": f"Week {i + 1} ({week_start} - {week_end})",
+            "start_date": week_start,
+            "end_date": week_end,
+        })
+
+    # Get the selected week
+    selected_week_id = request.args.get('selected_week', available_weeks[0]['id'])
+    selected_week = next((week for week in available_weeks if week['id'] == selected_week_id), available_weeks[0])
+
+    # Get the start and end dates for the selected week
+    start_of_week = selected_week["start_date"]
+    end_of_week = selected_week["end_date"]
+
+    # Generate days for the selected week
+    week_days = [
+        {
+            "date": (start_of_week + timedelta(days=i)).strftime('%Y-%m-%d'),
+            "label": (start_of_week + timedelta(days=i)).strftime('%A, %B %d'),
+        }
+        for i in range(7)
+    ]
+
+    # Initialize weekly data
+    weekly_tokes = {day["date"]: {"amount": 0, "hours": 0} for day in week_days}
+    weekly_total = 0
+    total_hours = 0
+
+    # Handle form submission
     if request.method == 'POST' and user_role == 'admin':
-        # Get data from the form
-        new_toke_count = request.form.get('toke_count')
-        adjust_date = request.form.get('adjust_date')  # "current" or "previous"
-        
-        # Calculate date based on gaming day logic
-        now = datetime.now()
-        gaming_day = now.date()
-        if adjust_date == "previous" or (now.hour < 6):
-            gaming_day -= timedelta(days=1)
-        
-        # Save to database
-        try:
-            new_toke = Toke(date=gaming_day, toke_count=float(new_toke_count), added_by="Admin")
+        selected_day = datetime.strptime(request.form.get('day'), '%Y-%m-%d').date()
+        toke_count = float(request.form.get('toke_count'))
+        hours_worked = float(request.form.get('hours_worked'))
+
+        # Check if an entry already exists
+        existing_entry = Toke.query.filter_by(date=selected_day).first()
+        if existing_entry:
+            existing_entry.toke_count = toke_count
+            existing_entry.hours_worked = hours_worked
+            flash('Toke entry updated successfully.', 'success')
+        else:
+            new_toke = Toke(date=selected_day, toke_count=toke_count, hours_worked=hours_worked, added_by="Admin")
             db.session.add(new_toke)
-            db.session.commit()
-        except Exception as e:
-            return f"An error occurred: {e}"
-    
-    # Retrieve data
-    toke_data = Toke.query.order_by(Toke.date.desc()).all()
-    total_toke_count = db.session.query(func.sum(Toke.toke_count)).scalar() or 0.0
-    
-    # Show current week's tip rate for dealers
-    current_week_tokes = Toke.query.filter(Toke.date >= (date.today() - timedelta(days=7))).all()
-    weekly_tip_rate = sum([toke.toke_count for toke in current_week_tokes])
-    
+            flash('Toke entry added successfully.', 'success')
+        db.session.commit()
+
+        # Redirect to refresh data
+        return redirect(url_for('toke', selected_week=selected_week_id))
+
+    # Fetch the latest data for the selected week
+    toke_entries = Toke.query.filter(Toke.date.between(start_of_week, end_of_week)).all()
+    for entry in toke_entries:
+        day_str = entry.date.strftime('%Y-%m-%d')
+        weekly_tokes[day_str] = {"amount": entry.toke_count, "hours": entry.hours_worked}
+
+    # Recalculate weekly totals
+    weekly_total = sum([data["amount"] for data in weekly_tokes.values()])
+    total_hours = sum([data["hours"] for data in weekly_tokes.values()])
+
+    # Pre-fill values for the selected day (if available)
+    selected_day = request.args.get('day', date.today().strftime('%Y-%m-%d'))
+    existing_entry = Toke.query.filter_by(date=datetime.strptime(selected_day, '%Y-%m-%d').date()).first()
+    prefilled_values = {
+        "toke_count": existing_entry.toke_count if existing_entry else "",
+        "hours_worked": existing_entry.hours_worked if existing_entry else "",
+    }
+
+    # Render the updated template
     return render_template(
-        'toke.html', 
-        toke_data=toke_data, 
-        total_toke_count=total_toke_count, 
-        weekly_tip_rate=weekly_tip_rate if user_role == 'dealer' else None, 
-        is_admin=(user_role == 'admin')
+        'toke.html',
+        current_week_label=selected_week["label"],
+        current_week_id=selected_week_id,
+        available_weeks=available_weeks,
+        weekly_tokes=weekly_tokes,
+        weekly_total=weekly_total,
+        total_hours=total_hours,
+        week_days=week_days,
+        prefilled_values=prefilled_values,
+        selected_day=selected_day,
+        is_admin=(user_role == 'admin'),
     )
 
+@app.route('/toke/history')
+def toke_history():
+    user_role = session.get('user_role')
+    if user_role != 'dealer':
+        flash('Access denied.', 'danger')
+        return redirect('/login')
+
+    history_data = []
+    for i in range(1, 5):  # Fetch last 4 weeks
+        start_date = date.today() - timedelta(days=i * 7)
+        end_date = start_date + timedelta(days=6)
+        week_data = Toke.query.filter(Toke.date.between(start_date, end_date)).all()
+        weekly_total = sum(toke.toke_count for toke in week_data)
+        history_data.append({
+            "label": f"{start_date} - {end_date}",
+            "days": {toke.date.strftime("%A"): toke.toke_count for toke in week_data},
+            "weekly_total": weekly_total
+        })
+    return render_template('history.html', history_data=history_data)
+
+@app.route('/toke/summary')
+def toke_summary():
+    user_role = session.get('user_role')
+    if user_role != 'admin':
+        flash('Access denied.', 'danger')
+        return redirect('/login')
+
+    today = date.today()
+    start_date = today - timedelta(days=14)
+    biweekly_data = Toke.query.filter(Toke.date >= start_date).all()
+
+    summary = {"weeks": {}, "weekly_totals": {}, "biweekly_total": 0, "total_hours": 0, "toke_rate": 0}
+    for i in range(2):
+        week_start = start_date + timedelta(days=i * 7)
+        week_end = week_start + timedelta(days=6)
+        week_data = [toke for toke in biweekly_data if week_start <= toke.date <= week_end]
+        weekly_total = sum(toke.toke_count for toke in week_data)
+        summary["weeks"][i + 1] = {toke.date.strftime("%A"): toke.toke_count for toke in week_data}
+        summary["weekly_totals"][i + 1] = weekly_total
+        summary["biweekly_total"] += weekly_total
+
+    summary["total_hours"] = 80
+    summary["toke_rate"] = summary["biweekly_total"] / summary["total_hours"] if summary["total_hours"] > 0 else 0
+
+    return render_template('summary.html', summary_data=summary, pay_period={"label": f"{start_date} - {today}"})
 
 @app.route('/toke/delete/<int:toke_id>', methods=['POST'])
 def delete_toke(toke_id):
@@ -107,7 +213,8 @@ def delete_toke(toke_id):
     except Exception as e:
         return f"An error occurred: {e}"
 
-# Casino Updates Routes
+# Casino Updates Routes (unchanged)
+
 @app.route('/updates')
 def updates():
     updates = CasinoUpdate.query.order_by(CasinoUpdate.date_posted.desc()).all()
@@ -119,7 +226,7 @@ def manage_updates():
     if session.get('user_role') != 'admin':
         flash('Access denied. Please log in as admin.', 'danger')
         return redirect('/login')
-    
+
     if request.method == 'POST':
         title = request.form.get('title')
         content = request.form.get('content')
@@ -146,7 +253,7 @@ def delete_update(update_id):
     flash('Casino update deleted successfully!', 'success')
     return redirect('/admin/updates')
 
-# Miscellaneous Routes
+# Miscellaneous Routes (unchanged)
 @app.route('/')
 def home():
     return render_template('index.html')
@@ -176,53 +283,33 @@ def tips():
 @app.route('/tips/<string:game>/manual')
 def main_game(game):
     valid_games = ["craps", "roulette", "blackjack", "baccarat"]
-    # Check if the game is valid
     if game not in valid_games:
-        flash("Invalid game selected.", "danger")
+        flash("Invalid game selected.", 'danger')
         return redirect('/tips')
 
-    # Check if the user requested the manual
-    if request.path.endswith('/manual'):
-        template = f'{game}_manual.html'
-    else:
-        template = f'{game}.html'
-
-    # Render the appropriate template
+    template = f'{game}_manual.html' if request.path.endswith('/manual') else f'{game}.html'
     try:
         return render_template(template)
     except:
         flash(f"The page {template} does not exist.", "warning")
         return redirect('/tips')
 
-
 @app.route('/tips/carnival')
 def carnival():
-    return render_template(f'carnival.html')
+    return render_template('carnival.html')
 
 @app.route('/tips/carnival/<string:game>')
 @app.route('/tips/carnival/<string:game>/manual')
 def carnival_game(game):
     valid_games = [
-        "high_card_flush", 
-        "mississippi_stud", 
-        "pai_gow", 
-        "three_card_poker", 
-        "spanish21", 
-        "war", 
-        "ultimate"
+        "high_card_flush", "mississippi_stud", "pai_gow",
+        "three_card_poker", "spanish21", "war", "ultimate"
     ]
-    # Check if the game is valid
     if game not in valid_games:
         flash("Invalid game selected.", "danger")
         return redirect('/tips/carnival')
 
-    # Check if the user requested the manual
-    if request.path.endswith('/manual'):
-        template = f'{game}_manual.html'
-    else:
-        template = f'{game}.html'
-
-    # Render the appropriate template
+    template = f'{game}_manual.html' if request.path.endswith('/manual') else f'{game}.html'
     try:
         return render_template(template)
     except:
@@ -234,4 +321,3 @@ if __name__ == '__main__':
     with app.app_context():
         db.create_all()
     app.run(host='0.0.0.0', port=5000, debug=True)
-

@@ -8,67 +8,99 @@
 </head>
 <body>
     <div class="container my-5">
-        <h1 class="text-center">Toke Tracker</h1>
+        <h1 class="text-center mb-4">Toke Tracker</h1>
+
+        <!-- Week Selection -->
+        <form method="GET" class="mb-4">
+            <label for="selected_week" class="form-label">Select Week:</label>
+            <select name="selected_week" id="selected_week" class="form-select" onchange="this.form.submit()">
+                {% for week in available_weeks %}
+                <option value="{{ week.id }}" {% if week.id == current_week_id %}selected{% endif %}>
+                    {{ week.label }}
+                </option>
+                {% endfor %}
+            </select>
+        </form>
         
-        <!-- Logout Button -->
-        <div class="text-end">
-            <a href="/logout" class="btn btn-danger">Logout</a>
+
+        <!-- Weekly Toke Table -->
+        <div class="card my-4">
+            <div class="card-body">
+                <h4 class="card-title text-center">Weekly Tokes: {{ current_week_label }}</h4>
+                <table class="table table-bordered text-center">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Day</th>
+                            <th>Toke Amount</th>
+                            <th>Hours Worked</th>
+                            <th>Daily Toke Rate</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for day, data in weekly_tokes.items() %}
+                        <tr>
+                            <td>{{ day }}</td>
+                            <td>${{ data['amount'] }}</td>
+                            <td>{{ data['hours'] }}</td>
+                            <td>
+                                {% if data['hours'] > 0 %}
+                                ${{ (data['amount'] / data['hours']) | round(2) }}
+                                {% else %}
+                                N/A
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        <tr class="table-secondary">
+                            <td><strong>Weekly Total</strong></td>
+                            <td><strong>${{ weekly_total }}</strong></td>
+                            <td><strong>{{ total_hours }}</strong></td>
+                            <td>
+                                {% if total_hours > 0 %}
+                                <strong>${{ (weekly_total / total_hours) | round(2) }}</strong>
+                                {% else %}
+                                <strong>N/A</strong>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
 
-        <!-- Display total toke count -->
-        <div class="alert alert-info text-center">
-            <h2>Total Toke Amount: ${{ total_toke_count }}</h2>
-        </div>
-
-        <!-- Dealer-Specific Data -->
-        {% if weekly_tip_rate is not none %}
-        <div class="alert alert-info text-center">
-            <h4>Dealer Weekly Tip Rate</h4>
-            <p>Current week's tip rate: ${{ weekly_tip_rate }}</p>
-        </div>
-        {% endif %}
-
-        <!-- Admin-Specific Tools -->
+        <!-- Admin View: Add or Update Toke Entry -->
         {% if is_admin %}
         <div class="card my-4">
             <div class="card-body">
-                <h4 class="card-title">Add New Toke Entry</h4>
-                <form method="POST">
+                <h4 class="card-title">
+                    {% if prefilled_values.toke_count or prefilled_values.hours_worked %}Update{% else %}Add{% endif %} Toke Entry
+                </h4>
+                <form method="POST" class="mb-4">
                     <div class="mb-3">
-                        <label for="toke_count" class="form-label">Enter Toke Count:</label>
-                        <input type="number" step="0.01" name="toke_count" id="toke_count" class="form-control" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="adjust_date" class="form-label">Select Date:</label>
-                        <select name="adjust_date" id="adjust_date" class="form-control">
-                            <option value="current">Current Day</option>
-                            <option value="previous">Previous Day (Gaming Day Adjusted)</option>
+                        <label for="day" class="form-label">Select Day:</label>
+                        <select name="day" id="day" class="form-control">
+                            {% for day in week_days %}
+                            <option value="{{ day.date }}" {% if day.date == selected_day %}selected{% endif %}>
+                                {{ day.label }}
+                            </option>
+                            {% endfor %}
                         </select>
                     </div>
-                    <button type="submit" class="btn btn-primary">Add Toke Count</button>
+                    <div class="mb-3">
+                        <label for="toke_count" class="form-label">Enter Toke Amount:</label>
+                        <input type="number" step="0.01" name="toke_count" id="toke_count" class="form-control" value="{{ prefilled_values.toke_count }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="hours_worked" class="form-label">Enter Hours Worked:</label>
+                        <input type="number" step="0.01" name="hours_worked" id="hours_worked" class="form-control" value="{{ prefilled_values.hours_worked }}" required>
+                    </div>
+                    <button type="submit" class="btn btn-success">
+                        {% if prefilled_values.toke_count or prefilled_values.hours_worked %}Update Entry{% else %}Add Entry{% endif %}
+                    </button>
                 </form>
             </div>
         </div>
         {% endif %}
-
-        <!-- Display list of all toke entries -->
-        <div>
-            <h3>All Toke Entries</h3>
-            <ul class="list-group">
-                {% for entry in toke_data %}
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                    <span>
-                        {{ entry.date }} - ${{ entry.toke_count }} (Added by: {{ entry.added_by }})
-                    </span>
-                    {% if is_admin %}
-                    <form method="POST" action="/toke/delete/{{ entry.id }}" class="mb-0">
-                        <button type="submit" class="btn btn-danger btn-sm">Delete</button>
-                    </form>
-                    {% endif %}
-                </li>
-                {% endfor %}
-            </ul>
-        </div>
 
         <!-- Back Button -->
         <div class="text-center mt-4">
