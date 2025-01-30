@@ -27,15 +27,18 @@ class CasinoUpdate(db.Model):
     title = db.Column(db.String(100), nullable=False)
     content = db.Column(db.Text, nullable=False)
     date_posted = db.Column(db.DateTime, default=datetime.utcnow)
+@app.route('/home')
+def home():
+    return render_template('index.html')
 
 # Authentication Routes
-@app.route('/login', methods=['GET', 'POST'])
+@app.route('/', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
         
-        if username == 'luckys' and password == 'windcreek1111':  # Dealer login
+        if username == 'luckys' and password == 'WindCreek1111':  # Dealer login
             session['user_role'] = 'dealer'
             flash('Login successful as Dealer!', 'success')
             return redirect('/toke')
@@ -52,7 +55,7 @@ def login():
 def logout():
     session.pop('user_role', None)
     flash('You have been logged out.', 'info')
-    return redirect('/login')
+    return redirect('/')
 
 # Toke Management Routes
 @app.route('/toke', methods=['GET', 'POST'])
@@ -254,9 +257,6 @@ def delete_update(update_id):
     return redirect('/admin/updates')
 
 # Miscellaneous Routes (unchanged)
-@app.route('/')
-def home():
-    return render_template('index.html')
 
 @app.route('/tricks')
 def tricks():

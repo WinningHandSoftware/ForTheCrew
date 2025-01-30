@@ -55,13 +55,13 @@
                             <td><strong>Weekly Total</strong></td>
                             <td><strong>${{ weekly_total }}</strong></td>
                             <td><strong>{{ total_hours }}</strong></td>
-                            <td>
+                            <!-- <td>
                                 {% if total_hours > 0 %}
                                 <strong>${{ (weekly_total / total_hours) | round(2) }}</strong>
                                 {% else %}
                                 <strong>N/A</strong>
                                 {% endif %}
-                            </td>
+                            </td> -->
                         </tr>
                     </tbody>
                 </table>
@@ -104,7 +104,7 @@
 
         <!-- Back Button -->
         <div class="text-center mt-4">
-            <a href="/" class="btn btn-secondary">Back</a>
+            <a href="/home" class="btn btn-secondary">Back</a>
         </div>
     </div>
 </body>
