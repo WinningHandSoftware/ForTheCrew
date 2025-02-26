@@ -38,7 +38,7 @@ def login():
         username = request.form.get('username')
         password = request.form.get('password')
         
-        if username == 'luckys' and password == 'WindCreek1111':  # Dealer login
+        if username == 'luckys' and password == 'WindCreek11112024$':  # Dealer login
             session['user_role'] = 'dealer'
             flash('Login successful as Dealer!', 'success')
             return redirect('/toke')
