@@ -42,8 +42,8 @@ def login():
             session['user_role'] = 'dealer'
             flash('Login successful as Dealer!', 'success')
             return redirect('/toke')
-        elif username == 'admin' and password == '1111WindCreek$2024':  # Admin login
-            session['user_role'] = 'Admin'
+        elif username == 'Admin' and password == '1111WindCreek$2024':  # Admin login
+            session['user_role'] = 'admin'
             flash('Login successful as Admin!', 'success')
             return redirect('/toke')
         else:
